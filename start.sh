@@ -1,49 +1,56 @@
 #!/bin/bash
+#Startup script for minecraft
+#https://github.com/nmarus/docker-minecraft
+#nmarus@gmail.com
 
 set -e
 
-#description:   timestamp
-#usage:         echo ${timestamp}
-#returns:       timestamp
+QUIET=false
+#SFLOG="/start.log"
 
+#print timestamp
 timestamp() {
-        date +"%Y-%m-%d %T"
+	date +"%Y-%m-%d %T"
 }
 
-#description:   script logger
-#usage:         sclog <message> [<file>]
-#returns:       dated log message
-
-sclog() {
-        if [ ! -z ${2+x} ]; then
-                #if $2 is existing character file or not exisiting
-                if [ -c ${2} ] || [ ! -a ${2} ]; then
-                        echo "$(timestamp): ${1}" | tee -a ${2}
-                else
-                        echo "$(timestamp): ${1}"
-                fi
-        else
-                echo "$(timestamp): ${1}"
-        fi
+#screen/file logger
+sflog() {
+	#if $1 is not null
+	if [ ! -z ${1+x} ]; then
+		message=$1
+	else
+		#exit function
+		return 1;
+	fi
+	#if $QUIET is not true
+	if ! $($QUIET); then
+		echo "${message}"
+	fi
+	#if $SFLOG is not null
+	if [ ! -z ${SFLOG+x} ]; then
+		#if $2 is regular file or does not exist
+		if [ -f ${SFLOG} ] || [ ! -e ${SFLOG} ]; then
+			echo "$(timestamp) ${message}" >> ${SFLOG}
+		fi
+	fi
 }
-
 
 #get current minecraft version
-sclog "Getting updated minecraft version."
+sflog "Getting updated minecraft version."
 VER=$(wget -q -O - https://s3.amazonaws.com/Minecraft.Download/versions/versions.json | jsawk -n 'out(this.latest.release)')
 
 #set minecraft dir and jar
-MCDIR="/data"
-MC="$MCDIR/minecraft-server.jar"
+MCDIR="/minecraft"
+MCJAR="$MCDIR/minecraft-server.jar"
 
 #remove current minecraft executable if it exists
-if [ -e $MC ]; then
-        rm -rf $MC &> /dev/null
+if [ -e $MCJAR ]; then
+  rm -rf $MCJAR &> /dev/null
 fi
-        
+
 #get minecraft
-sclog "Downloading https://s3.amazonaws.com/Minecraft.Download/versions/$VER/minecraft_server.$VER.jar"
-wget -q -O $MC https://s3.amazonaws.com/Minecraft.Download/versions/$VER/minecraft_server.$VER.jar &> /dev/null
+sflog "Downloading https://s3.amazonaws.com/Minecraft.Download/versions/$VER/minecraft_server.$VER.jar"
+wget -q -O $MCJAR https://s3.amazonaws.com/Minecraft.Download/versions/$VER/minecraft_server.$VER.jar &> /dev/null
 
 #accept eula
 echo "eula=true" > $MCDIR/eula.txt
@@ -52,9 +59,9 @@ echo "eula=true" > $MCDIR/eula.txt
 chown -R minecraft:minecraft $MCDIR &> /dev/null
 
 #start minecraft
-sclog "Starting minecraft v.$VER..."
-cd /data
-exec sudo -E -u minecraft java -Xmx1024M -Xms1024M -jar $MC
+sflog "Starting minecraft v.$VER..."
+cd $MCDIR
+exec sudo -E -u minecraft java -Xmx1024M -Xms1024M -jar $MCJAR
 
 #exit
-sclog "Exiting container..." 
+sflog "Exiting container..."
